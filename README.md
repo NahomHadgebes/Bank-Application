@@ -29,8 +29,11 @@ unt number, account holder name, and initial balance.
    git clone https://github.com/yourusername/bank-application.git
    cd bank-application
    
+Install Dependencies:
 dotnet add package Spectre.Console
 dotnet add package FluentValidation
+
+Build and Run the Project:
 dotnet build
 dotnet run
 
