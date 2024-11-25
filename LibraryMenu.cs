@@ -1,5 +1,6 @@
 ﻿using BankApplication.Models;
 using Spectre.Console;
+using System.Globalization;
 
 namespace BankApplication
 {
@@ -8,7 +9,6 @@ namespace BankApplication
         public static void ShowMainMeny()
         {
             IBankService bankService = new BankService();
-
             bankService.LoadData();
 
             bool runApp = true;
@@ -22,40 +22,40 @@ namespace BankApplication
                 table.AddColumn("[yellow]Option[/]");
                 table.AddColumn("[yellow]Description[/]");
 
-                table.AddRow("1", "Create Account");
-                table.AddRow("2", "Make a transaction");
-                table.AddRow("3", "View all accounts");
-                table.AddRow("4", "View transaction history");
-                table.AddRow("5", "Exit");
+                table.AddRow("Create Account", "Create a new bank account");
+                table.AddRow("Make a transaction", "Deposit or withdraw money");
+                table.AddRow("View all accounts", "View all current accounts");
+                table.AddRow("View transaction history", "View history of transactions");
+                table.AddRow("Exit", "Exit the application");
 
                 AnsiConsole.Write(table);
 
-                string choice = AnsiConsole.Prompt(
+                var choice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("Please select an option")
-                        .AddChoices("1", "2", "3", "4", "5"));
+                        .AddChoices("Create Account", "Make a transaction", "View all accounts", "View transaction history", "Exit"));
 
                 switch (choice)
                 {
-                    case "1":
+                    case "Create Account":
                         SkapaKonto(bankService);
                         break;
-                    case "2":
+                    case "Make a transaction":
                         GörTransaktion(bankService);
                         break;
-                    case "3":
+                    case "View all accounts":
                         VisaAllaKonton(bankService);
                         break;
-                    case "4":
+                    case "View transaction history":
                         VisaTransaktionsHistorik(bankService);
                         break;
-                    case "5":
+                    case "Exit":
                         runApp = false;
                         bankService.SaveData();
                         AnsiConsole.Markup("[bold green]Thank you for using the banking application![/]");
                         break;
                     default:
-                        AnsiConsole.Markup("[bold red]Invalid option. Please try again.[/]"); ;
+                        AnsiConsole.Markup("[bold red]Invalid option. Please try again.[/]");
                         break;
                 }
             }
@@ -63,32 +63,51 @@ namespace BankApplication
         static void SkapaKonto(IBankService bankService)
         {
             Console.Write("Enter the account holder: ");
-            string accountHolder = Console.ReadLine();
+            string accountHolder = HämtaGiltigtKontoinnehavare();
+
             Console.Write("Enter the starting amount: ");
-            decimal balance = Convert.ToDecimal(Console.ReadLine());
+            decimal balance = HämtaGiltigDecimalInput();
 
             bankService.CreateAccount(accountHolder, balance);
             Console.WriteLine("Account created successfully!");
-            Console.WriteLine("Press any key to return to main menu ");
+
+            var accounts = bankService.GetAllAccounts();
+            var createdAccount = accounts.Last();
+
+            AnsiConsole.MarkupLine($"[bold green]Account Number: {createdAccount.AccountNumber}[/]");
+            Console.WriteLine("Press any key to return to the main menu.");
             Console.ReadKey();
         }
+
         static void GörTransaktion(IBankService bankService)
         {
-            Console.Write("Enter the account number: ");
-            int accountNumber = Convert.ToInt32(Console.ReadLine());
+            var accounts = bankService.GetAllAccounts();
+            var accountChoices = accounts.Select(a => $"{a.AccountNumber} - {a.AccountHolder} - Balance: {a.Balance} SEK").ToList();
+
+            string selectedAccount = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select an account for the transaction")
+                    .AddChoices(accountChoices)
+            );
+
+            int selectedAccountNumber = Convert.ToInt32(selectedAccount.Split('-')[0].Trim());
+
             Console.Write("Enter amount: ");
-            decimal amount = Convert.ToDecimal(Console.ReadLine());
-            Console.Write("Enter transaction type (deposit/withdrawal): ");
-            string type = Console.ReadLine();
+            decimal amount = HämtaGiltigDecimalInput();
+
+            string type = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select transaction type")
+                    .AddChoices("Deposit", "Withdrawal"));
 
             try
             {
                 var transactionValidator = new TransactionValidator();
                 var transaction = new Transaction
                 {
-                    AccountNumber = accountNumber,
+                    AccountNumber = selectedAccountNumber,
                     Amount = amount,
-                    Type = type,
+                    Type = type.ToLower(),
                     Date = DateTime.Now
                 };
 
@@ -100,7 +119,6 @@ namespace BankApplication
                         .Start(ctx =>
                         {
                             var task = ctx.AddTask("[green]Processing Transaction...[/]");
-
                             for (int i = 0; i < 10; i++)
                             {
                                 task.Increment(10);
@@ -108,7 +126,8 @@ namespace BankApplication
                             }
                         });
 
-                    bankService.MakeTransaction(accountNumber, amount, type);
+                    bankService.MakeTransaction(selectedAccountNumber, amount, type);
+
                     AnsiConsole.Markup("[bold green]Transaction completed successfully![/]\n");
                 }
                 else
@@ -121,7 +140,7 @@ namespace BankApplication
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                AnsiConsole.MarkupLine($"[bold red]An error occurred:[/] {ex.Message}");
             }
 
             Console.ReadKey();
@@ -129,40 +148,105 @@ namespace BankApplication
         static void VisaAllaKonton(IBankService bankService)
         {
             var accounts = bankService.GetAllAccounts();
-
-            var table = new Table();
-            table.AddColumn("[yellow]Account Number[/]");
-            table.AddColumn("[yellow]Account Holder[/]");
-            table.AddColumn("[yellow]Balance[/]");
-
-            foreach (var account in accounts)
+            if (accounts.Count == 0)
             {
-                table.AddRow(account.AccountNumber.ToString(), account.AccountHolder, account.Balance.ToString("0.00") + " SEK");
+                AnsiConsole.MarkupLine("[bold yellow]No accounts found![/]");
+            }
+            else
+            {
+                var table = new Table();
+                table.AddColumn("[yellow]Account Number[/]");
+                table.AddColumn("[yellow]Account Holder[/]");
+                table.AddColumn("[yellow]Balance[/]");
+
+                foreach (var account in accounts)
+                {
+                    table.AddRow(account.AccountNumber.ToString(), account.AccountHolder, account.Balance.ToString("0.00") + " SEK");
+                }
+
+                AnsiConsole.Write(table);
             }
 
-            AnsiConsole.Write(table);
             Console.ReadKey();
         }
         static void VisaTransaktionsHistorik(IBankService bankService)
         {
-            Console.Write("Enter the account number: ");
-            int accountNumber = Convert.ToInt32(Console.ReadLine());
-
-            var transactions = bankService.GetTransactionHistory(accountNumber);
-            if (transactions.Count > 0)
+            var accounts = bankService.GetAllAccounts();
+            if (accounts.Count == 0)
             {
-                foreach (var transaction in transactions)
-                {
-                    Console.WriteLine($"{transaction.Date} - {transaction.Type} - {transaction.Amount} SEK");
-                }
+                AnsiConsole.MarkupLine("[bold yellow]No accounts available to view transaction history![/]");
+                Console.ReadKey();
+                return;
+            }
+
+            var accountChoices = accounts.Select(a => $"{a.AccountNumber} - {a.AccountHolder} - Balance: {a.Balance} SEK").ToList();
+
+            string selectedAccount = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select an account to view transaction history")
+                    .AddChoices(accountChoices)
+            );
+
+            int selectedAccountNumber = Convert.ToInt32(selectedAccount.Split('-')[0].Trim());
+
+            var transactions = bankService.GetTransactionHistory(selectedAccountNumber);
+
+            if (transactions.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[bold yellow]No transaction history for this account![/]");
             }
             else
             {
-                Console.WriteLine("No transaction history exists for this account.");
+                var table = new Table();
+                table.AddColumn("[yellow]Date[/]");
+                table.AddColumn("[yellow]Type[/]");
+                table.AddColumn("[yellow]Amount[/]");
+
+                foreach (var transaction in transactions)
+                {
+                    table.AddRow(transaction.Date.ToString("g"), transaction.Type, $"{transaction.Amount} SEK");
+                }
+
+                AnsiConsole.Write(table);
             }
 
             Console.ReadKey();
         }
+
+        static decimal HämtaGiltigDecimalInput()
+        {
+            decimal value;
+            while (true)
+            {
+                string input = Console.ReadLine();
+                if (decimal.TryParse(input, NumberStyles.Any, CultureInfo.InvariantCulture, out value) && value > 0)
+                {
+                    return value;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid input. Please enter a valid positive decimal amount.");
+                }
+            }
+        }
+        static string HämtaGiltigtKontoinnehavare()
+        {
+            while (true)
+            {
+                string accountHolder = Console.ReadLine();
+                if (!string.IsNullOrWhiteSpace(accountHolder))
+                {
+                    return accountHolder;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid input. Account holder's name cannot be empty. Please try again:");
+                }
+            }
+        }
+
     }
 }
+
+
 

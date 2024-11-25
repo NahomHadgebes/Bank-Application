@@ -9,54 +9,63 @@ namespace BankApplication.Models
 
         public void CreateAccount(string accountHolder, decimal initialBalance)
         {
+            if (accounts.Any(a => a.AccountHolder.Equals(accountHolder, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new Exception("An account with this holder already exists.");
+            }
+
+            int accountNumber = accounts.Count > 0 ? accounts.Max(a => a.AccountNumber) + 1 : 1;
+
             var newAccount = new Account
             {
-                AccountNumber = accounts.Count + 1,
+                AccountNumber = accountNumber,
                 AccountHolder = accountHolder,
                 Balance = initialBalance
             };
+
             accounts.Add(newAccount);
             SaveData();
         }
+
         public void MakeTransaction(int accountNumber, decimal amount, string type)
         {
             var account = accounts.Find(a => a.AccountNumber == accountNumber);
-            if (account != null)
-            {
-                if (type == "deposit")
-                {
-                    account.Balance += amount;
-                }
-                else if (type == "withdrawal")
-                {
-                    if (account.Balance >= amount)
-                    {
-                        account.Balance -= amount;
-                    }
-                    else
-                    {
-                        throw new Exception("Insufficient funds.");
-                    }
-                }
-                else
-                {
-                    throw new Exception("Invalid transaction type.");
-                }
-
-                transactions.Add(new Transaction
-                {
-                    AccountNumber = accountNumber,
-                    Amount = amount,
-                    Type = type,
-                    Date = DateTime.Now
-                });
-            }
-            else
+            if (account == null)
             {
                 throw new Exception("Account not found.");
             }
+
+            if (type == "Deposit")
+            {
+                account.Balance += amount;
+            }
+            else if (type == "Withdrawal")
+            {
+                if (account.Balance >= amount)
+                {
+                    account.Balance -= amount;
+                }
+                else
+                {
+                    throw new Exception("Insufficient funds.");
+                }
+            }
+            else
+            {
+                throw new Exception("Invalid transaction type.");
+            }
+
+            transactions.Add(new Transaction
+            {
+                AccountNumber = accountNumber,
+                Amount = amount,
+                Type = type.ToLower(),
+                Date = DateTime.Now
+            });
+
             SaveData();
         }
+
         public List<Account> GetAllAccounts()
         {
             return accounts;
@@ -94,6 +103,16 @@ namespace BankApplication.Models
                     transactions = data.Transactions ?? new List<Transaction>();
                 }
             }
+        }
+        private int GenerateUniqueAccountNumber()
+        {
+            int newAccountNumber;
+            do
+            {
+                newAccountNumber = accounts.Count > 0 ? accounts.Max(a => a.AccountNumber) + 1 : 1;
+            } while (accounts.Any(a => a.AccountNumber == newAccountNumber));
+
+            return newAccountNumber;
         }
 
     }

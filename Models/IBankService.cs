@@ -1,5 +1,4 @@
-﻿using BankApplication.Models;
-namespace BankApplication.Models
+﻿namespace BankApplication.Models
 
 {
     public interface IBankService

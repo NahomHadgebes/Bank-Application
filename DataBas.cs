@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace BankApplication.Models
+﻿namespace BankApplication.Models
 {
     public class DataBas
     {
